@@ -1,46 +1,128 @@
 pipeline {
     agent any
+
     tools {
         maven '3.9.9'
     }
+
+    environment {
+        DOCKER_IMAGE = "agalya1908/demo-app"
+        APP_PORT = "8088"
+    }
+
     stages {
+
         stage('Verify Tools') {
             steps {
                 echo "Verifying Java, Maven, Git, and Docker versions"
-                sh """
-
-
+                sh '''
                     # Maven check
-                    MAVEN_VER=\$(mvn -v | awk 'NR==1{print \$3}')
-                    echo "Detected Maven version: \$MAVEN_VER"
-                    MAVEN_MAJOR=\$(echo \$MAVEN_VER | awk -F. '{print \$1}')
-                    if [ "\$MAVEN_MAJOR" -lt 3 ]; then
+                    MAVEN_VER=$(mvn -v | awk 'NR==1{print $3}')
+                    echo "Detected Maven version: $MAVEN_VER"
+                    MAVEN_MAJOR=$(echo $MAVEN_VER | awk -F. '{print $1}')
+                    if [ "$MAVEN_MAJOR" -lt 3 ]; then
                         echo "ERROR: Maven 3.x or higher is required!"
                         exit 1
                     fi
 
                     # Git check
-                    GIT_VER=\$(git --version | awk '{print \$3}')
-                    echo "Detected Git version: \$GIT_VER"
-                    GIT_MAJOR=\$(echo \$GIT_VER | awk -F. '{print \$1}')
-                    if [ "\$GIT_MAJOR" -lt 2 ]; then
+                    GIT_VER=$(git --version | awk '{print $3}')
+                    echo "Detected Git version: $GIT_VER"
+                    GIT_MAJOR=$(echo $GIT_VER | awk -F. '{print $1}')
+                    if [ "$GIT_MAJOR" -lt 2 ]; then
                         echo "ERROR: Git 2.x or higher is required!"
                         exit 1
                     fi
 
                     # Docker check
-                    DOCKER_VER=\$(docker --version | awk '{print \$3}' | sed 's/,//')
-                    echo "Detected Docker version: \$DOCKER_VER"
-                    DOCKER_MAJOR=\$(echo \$DOCKER_VER | awk -F. '{print \$1}')
-                    if [ "\$DOCKER_MAJOR" -lt 20 ]; then
+                    DOCKER_VER=$(docker --version | awk '{print $3}' | sed 's/,//')
+                    echo "Detected Docker version: $DOCKER_VER"
+                    DOCKER_MAJOR=$(echo $DOCKER_VER | awk -F. '{print $1}')
+                    if [ "$DOCKER_MAJOR" -lt 20 ]; then
                         echo "ERROR: Docker 20.x or higher is required!"
                         exit 1
                     fi
-                """
+                '''
             }
         }
 
         stage('Compile and Clean') {
+            steps {
+                sh 'mvn clean compile'
+            }
+        }
+
+        stage('Package') {
+            steps {
+                sh 'mvn package'
+            }
+        }
+
+        stage('Docker Cleanup') {
+            steps {
+                echo "Cleaning up old Docker containers and images"
+                sh '''
+                    # Find and stop container exposing APP_PORT
+                    OLD_CONTAINER=$(docker ps --filter "status=running" --format "{{.ID}} {{.Ports}}" | grep "${APP_PORT}" | awk '{print $1}')
+                    if [ ! -z "$OLD_CONTAINER" ]; then
+                        echo "Stopping old container: $OLD_CONTAINER"
+                        docker stop $OLD_CONTAINER
+                        docker rm $OLD_CONTAINER
+                    fi
+
+                    # Remove old images with same name
+                    OLD_IMAGE=$(docker images -q ${DOCKER_IMAGE})
+                    if [ ! -z "$OLD_IMAGE" ]; then
+                        echo "Removing old image: $OLD_IMAGE"
+                        docker rmi -f $OLD_IMAGE
+                    fi
+                '''
+            }
+        }
+
+        stage('Build Docker Image') {
+            steps {
+                echo "Building Docker image"
+                sh 'docker build -t ${DOCKER_IMAGE}:${BUILD_NUMBER} .'
+            }
+        }
+
+        stage('Docker Login') {
+            steps {
+                withCredentials([usernamePassword(credentialsId: 'docker-creds', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
+                    sh 'echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin'
+                }
+            }
+        }
+
+        stage('Docker Push') {
+            steps {
+                sh 'docker push ${DOCKER_IMAGE}:${BUILD_NUMBER}'
+            }
+        }
+
+        stage('Docker Deploy') {
+            steps {
+                sh 'docker run -itd -p ${APP_PORT}:${APP_PORT} ${DOCKER_IMAGE}:${BUILD_NUMBER}'
+            }
+        }
+
+        stage('Archive Artifacts') {
+            steps {
+                archiveArtifacts '**/target/*.jar'
+            }
+        }
+    }
+
+    post {
+        success {
+            echo "✅ Pipeline completed successfully!"
+        }
+        failure {
+            echo "❌ Pipeline failed."
+        }
+    }
+}
             steps {
                 sh 'mvn clean compile'
             }
