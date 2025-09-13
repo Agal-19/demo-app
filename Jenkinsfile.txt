@@ -16,7 +16,6 @@ pipeline {
             steps {
                 echo "Verifying Java, Maven, Git, and Docker versions"
                 sh '''
-                    # Maven check
                     MAVEN_VER=$(mvn -v | awk 'NR==1{print $3}')
                     echo "Detected Maven version: $MAVEN_VER"
                     MAVEN_MAJOR=$(echo $MAVEN_VER | awk -F. '{print $1}')
@@ -25,7 +24,6 @@ pipeline {
                         exit 1
                     fi
 
-                    # Git check
                     GIT_VER=$(git --version | awk '{print $3}')
                     echo "Detected Git version: $GIT_VER"
                     GIT_MAJOR=$(echo $GIT_VER | awk -F. '{print $1}')
@@ -34,7 +32,6 @@ pipeline {
                         exit 1
                     fi
 
-                    # Docker check
                     DOCKER_VER=$(docker --version | awk '{print $3}' | sed 's/,//')
                     echo "Detected Docker version: $DOCKER_VER"
                     DOCKER_MAJOR=$(echo $DOCKER_VER | awk -F. '{print $1}')
@@ -62,7 +59,6 @@ pipeline {
             steps {
                 echo "Cleaning up old Docker containers and images"
                 sh '''
-                    # Find and stop container exposing APP_PORT
                     OLD_CONTAINER=$(docker ps --filter "status=running" --format "{{.ID}} {{.Ports}}" | grep "${APP_PORT}" | awk '{print $1}')
                     if [ ! -z "$OLD_CONTAINER" ]; then
                         echo "Stopping old container: $OLD_CONTAINER"
@@ -70,7 +66,6 @@ pipeline {
                         docker rm $OLD_CONTAINER
                     fi
 
-                    # Remove old images with same name
                     OLD_IMAGE=$(docker images -q ${DOCKER_IMAGE})
                     if [ ! -z "$OLD_IMAGE" ]; then
                         echo "Removing old image: $OLD_IMAGE"
@@ -123,71 +118,4 @@ pipeline {
         }
     }
 }
-            steps {
-                sh 'mvn clean compile'
-            }
-        }
 
-        stage('Package') {
-            steps {
-                sh 'mvn package'
-            }
-        }
-
-        stage('Docker Cleanup') {
-            steps {
-                echo "Cleaning up old Docker containers and images"
-                sh """
-                    # Stop any container using port 8088
-                    OLD_CONTAINER=\$(docker ps -q -f "publish=8088")
-                    if [ ! -z "\$OLD_CONTAINER" ]; then
-                        echo "Stopping old container: \$OLD_CONTAINER"
-                        docker stop \$OLD_CONTAINER
-                        docker rm \$OLD_CONTAINER
-                    fi
-
-                    # Remove old images with the same name
-                    OLD_IMAGE=\$(docker images -q agalya1908/demo-app)
-                    if [ ! -z "\$OLD_IMAGE" ]; then
-                        echo "Removing old image: \$OLD_IMAGE"
-                        docker rmi -f \$OLD_IMAGE
-                    fi
-                """
-            }
-        }
-
-        stage('Build Docker Image') {
-            steps {
-                echo "Building Docker image"
-                sh 'docker build -t agalya1908/demo-app:${BUILD_NUMBER} .'
-            }
-        }
-
-        stage('Docker Login') {
-            steps {
-                //withCredentials([string(credentialsId: 'dockerId', variable: 'Dockerpwd')]) {
-                    //sh 'docker login -u agalya1908 -p ${Dockerpwd}'
-
-                }
-            }
-        }
-
-        stage('Docker Push') {
-            steps {
-                sh 'docker push agalya1908/demo-app:${BUILD_NUMBER}'
-            }
-        }
-
-        stage('Docker Deploy') {
-            steps {
-                sh 'docker run -itd -p 8088:8088 agalya1908/demo-app:${BUILD_NUMBER}'
-            }
-        }
-
-        stage('Archive Artifacts') {
-            steps {
-                archiveArtifacts '**/target/*.jar'
-            }
-        }
-    }
-}
