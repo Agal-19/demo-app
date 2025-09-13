@@ -77,27 +77,27 @@ pipeline {
         stage('Build Docker Image') {
             steps {
                 echo "Building Docker image"
-                sh 'docker build -t dhileepan1989/demo-app:${BUILD_NUMBER} .'
+                sh 'docker build -t agalya1908/demo-app:${BUILD_NUMBER} .'
             }
         }
 
         stage('Docker Login') {
             steps {
-                withCredentials([string(credentialsId: 'DockerId', variable: 'Dockerpwd')]) {
-                    sh 'docker login -u dhileepan1989 -p ${Dockerpwd}'
+                withCredentials([string(credentialsId: 'dockerId', variable: 'Dockerpwd')]) {
+                    sh 'docker login -u agalya1908 -p ${Dockerpwd}'
                 }
             }
         }
 
         stage('Docker Push') {
             steps {
-                sh 'docker push dhileepan1989/demo-app:${BUILD_NUMBER}'
+                sh 'docker push agalya1908/demo-app:${BUILD_NUMBER}'
             }
         }
 
         stage('Docker Deploy') {
             steps {
-                sh 'docker run -itd -p 8088:8088 dhileepan1989/demo-app:${BUILD_NUMBER}'
+                sh 'docker run -itd -p 8088:8088 agalya1908/demo-app:${BUILD_NUMBER}'
             }
         }
 
