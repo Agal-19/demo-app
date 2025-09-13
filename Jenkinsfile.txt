@@ -65,7 +65,7 @@ pipeline {
                     fi
 
                     # Remove old images with the same name
-                    OLD_IMAGE=\$(docker images -q dhileepan1989/demo-app)
+                    OLD_IMAGE=\$(docker images -q agalya1908/demo-app)
                     if [ ! -z "\$OLD_IMAGE" ]; then
                         echo "Removing old image: \$OLD_IMAGE"
                         docker rmi -f \$OLD_IMAGE
