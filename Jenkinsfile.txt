@@ -83,8 +83,11 @@ pipeline {
 
         stage('Docker Login') {
             steps {
-                withCredentials([string(credentialsId: 'dockerId', variable: 'Dockerpwd')]) {
-                    sh 'docker login -u agalya1908 -p ${Dockerpwd}'
+                //withCredentials([string(credentialsId: 'dockerId', variable: 'Dockerpwd')]) {
+                    //sh 'docker login -u agalya1908 -p ${Dockerpwd}'
+                withCredentials([string(credentialsId: 'DockerId', variable: 'agalya123')]) {
+    // some block
+}
                 }
             }
         }
